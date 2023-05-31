@@ -1,124 +1,29 @@
+#![allow(non_snake_case)]
+
+/// Universidad Panamericana
+/// Facultad de Ingeniería
+///
+/// Proyecto Final:  Inteligencia Artificial.
+/// N-Queens Puzzle
+///
+/// Mayo 31, 2023
+/// Osornio López Daniel Alejandro (0244685@up.edu.mx)
+/// Hernandez Toledo Daniel (0243179@up.edu.mx)
+///
+/// Este archivo contiene el código del programa principal, es decir del ejecutable,
+/// así como la declaración de estructuras y métodos que hacen posible resolver el problema
+/// usando el método de Iterative Fix, esto es, mejora iterativa.
+///
+/// Para ejecutar el código se necesita tener `cargo`, el manager de paquetes del lenguaje
+/// de programación Rust instalado.
+/// Una vez instalado, desde la terminal, a nivel del archivo Cargo.toml (raíz del proyecto)
+/// ejecutar:
+///
+///     cargo run --release
+///
+
 use std::collections::HashSet;
 use rand::{seq::IteratorRandom, Rng};
-
-fn printf(s: &str) {
-    print!("{s}");
-    use std::io::Write;
-    let mut a = std::io::stdout().lock();
-    a.flush();
-}
-
-fn main() -> Result<(), &'static str> {
-    let mut n_value = String::new();
-    printf("Ingresa el valor de N: ");
-    let n = std::io::stdin().read_line(&mut n_value);
-
-    if let (Ok(_), Ok(N)) = (n, n_value.trim().parse::<usize>()) {
-        if N < 4 {
-            return Err("No se permiten valores de N menores a 4");
-        }
-
-        n_value.clear();
-        printf("Deseas mostrar información para cada paso? [y/N]: ");
-        let n = std::io::stdin().read_line(&mut n_value);
-        if let (Ok(_), verbose) = (n, n_value.trim().to_lowercase() == "y" ) {
-
-            n_value.clear();
-            printf("Deseas ingresar un estado inicial para el problema? [y/N]: ");
-            let n = std::io::stdin().read_line(&mut n_value);
-            if let (Ok(_), wants_init) = (n, n_value.trim().to_lowercase() == "y" ) {
-
-                let mut n8_queens = if wants_init {
-                    n_value.clear();
-                    println!("Ingresa los valores del estado separados por comas");
-                    println!("Un ejemplo de estado es [0, 3, 2, 1] para una N = 4");
-                    println!("    En el ejemplo:");
-                    println!("        - La reina 0 esta en la fila 0 y columna 0");
-                    println!("        - La reina 1 esta en la fila 1 y columna 3");
-                    println!("        - La reina 2 esta en la fila 2 y columna 2");
-                    println!("        - La reina 3 esta en la fila 3 y columna 1");
-                    println!("        - Todos los valores son menores a N");
-                    println!("        - Los valores estan separados por ','");   
-                    printf("Ingresa ahora el estado: ");
-                    let n = std::io::stdin().read_line(&mut n_value);
-
-                    if n.is_ok() {
-                        let mut array = Vec::with_capacity(N);
-                        let res = n_value.trim()
-                            .replace("[", "")
-                            .replace("]", "")
-                            .replace(" ", "")
-                            .split(",")
-                        .try_for_each(|val| {
-                            let res = val.trim().parse::<usize>();
-
-                            if res.is_err() {
-                                Err(format!("Valor '{}' no es un número válido", val))
-                            } else {
-                                if res.unwrap() >= N {
-                                    Err(format!("Valor '{}' mayor o igual a N ({})", val, N))
-                                } else {
-                                    Ok(())
-                                }
-                            }
-                        });
-
-                        if let Err(error) = res {
-                            println!("Error: {}. Fallbacking to random initial state", error);
-                            NQueens::new(N).unwrap().into_random_state()
-                        } else {
-                            n_value.trim()
-                            .replace("[", "")
-                            .replace("]", "")
-                            .replace(" ", "")
-                            .split(",")
-                            .for_each(|val| {
-                                array.push(val.trim().parse::<usize>().unwrap())
-                            });
-                            if array.len() != N {
-                                println!("Not enough values. Fallbacking to random initial state");
-                                NQueens::new(N).unwrap().into_random_state()
-                            } else {
-                                let mut res = NQueens::new(N).unwrap().into_random_state();
-                                res.queens = array;
-                                res
-                            }
-                        }
-                    } else {
-                        println!("Error: Wronng input. Fallbacking to random initial state");
-                        NQueens::new(N).unwrap().into_random_state()
-                    }
-                } else {
-                    NQueens::new(N).unwrap().into_random_state()
-                };
-
-                n8_queens.verbose = verbose;
-                let initial_state = n8_queens.clone();
-
-                if verbose {
-                    println!("{}\n", n8_queens);
-                }
-
-                let mut iterations = 0;
-                while n8_queens.step() != 0 {
-                    if verbose {
-                        println!("{}\n", n8_queens);
-                    }
-                    iterations += 1;
-                }
-
-                println!("Terminado con {iterations} iteraciones.");
-                println!("Estado inicial: ");
-                println!("{initial_state}\n");
-                println!("Estado final: ");
-                println!("{n8_queens}\n");
-            }
-        }
-        Ok(())
-    } else {
-        Err("Valor de N inválido. Ingresa un valor de N válido")
-    }
-}
 
 /// Máquina de estado de un problema de N-Reinas
 ///
@@ -348,5 +253,138 @@ impl std::fmt::Display for NQueens {
             Ok(())
         })?;
         Ok(())
+    }
+}
+
+/// Función para imprimir a renglón seguido
+fn printf(s: &str) {
+    print!("{s}");
+    use std::io::Write;
+    let mut a = std::io::stdout().lock();
+    a.flush().unwrap();
+}
+
+/// Función main que ejecuta la logica principal del progrma
+fn main() -> Result<(), &'static str> {
+    let mut n_value = String::new();
+    printf("Ingresa el valor de N: ");
+    let n = std::io::stdin().read_line(&mut n_value);
+
+    // Verificamos que N sea válido
+    if let (Ok(_), Ok(N)) = (n, n_value.trim().parse::<usize>()) {
+        if N < 4 {
+            return Err("No se permiten valores de N menores a 4");
+        }
+
+        n_value.clear();
+        printf("Deseas mostrar información para cada paso? [y/N]: ");
+        let n = std::io::stdin().read_line(&mut n_value);
+
+        // Leemos el valor ingresado para saber si quiere más información
+        if let (Ok(_), verbose) = (n, n_value.trim().to_lowercase() == "y" ) {
+
+            n_value.clear();
+            printf("Deseas ingresar un estado inicial para el problema? [y/N]: ");
+            let n = std::io::stdin().read_line(&mut n_value);
+
+            // Verificamos si quiere indicar un estado inicial
+            if let (Ok(_), wants_init) = (n, n_value.trim().to_lowercase() == "y" ) {
+
+                // Si quiere indicar estado inicial, lo leemos y parseamos en un vector.
+                // Este `statement` regresa un problema de NQueens, sea random si hubo algun
+                // error o asi lo quizo por defecto, o el especificado si el usuario ingresó
+                // los datos de forma correcta
+                let mut n8_queens = if wants_init {
+                    n_value.clear();
+                    println!("Ingresa los valores del estado separados por comas");
+                    println!("Un ejemplo de estado es [0, 3, 2, 1] para una N = 4");
+                    println!("    En el ejemplo:");
+                    println!("        - La reina 0 esta en la fila 0 y columna 0");
+                    println!("        - La reina 1 esta en la fila 1 y columna 3");
+                    println!("        - La reina 2 esta en la fila 2 y columna 2");
+                    println!("        - La reina 3 esta en la fila 3 y columna 1");
+                    println!("        - Todos los valores son menores a N");
+                    println!("        - Los valores estan separados por ','");
+                    printf("Ingresa ahora el estado: ");
+                    let n = std::io::stdin().read_line(&mut n_value);
+
+                    if n.is_ok() {
+                        let mut array = Vec::with_capacity(N);
+                        let res = n_value.trim()
+                            .replace("[", "")
+                            .replace("]", "")
+                            .replace(" ", "")
+                            .split(",")
+                        .try_for_each(|val| {
+                            let res = val.trim().parse::<usize>();
+
+                            if res.is_err() {
+                                Err(format!("Valor '{}' no es un número válido", val))
+                            } else {
+                                if res.unwrap() >= N {
+                                    Err(format!("Valor '{}' mayor o igual a N ({})", val, N))
+                                } else {
+                                    Ok(())
+                                }
+                            }
+                        });
+
+                        if let Err(error) = res {
+                            println!("Error: {}. Fallbacking to random initial state", error);
+                            NQueens::new(N).unwrap().into_random_state()
+                        } else {
+                            n_value.trim()
+                            .replace("[", "")
+                            .replace("]", "")
+                            .replace(" ", "")
+                            .split(",")
+                            .for_each(|val| {
+                                array.push(val.trim().parse::<usize>().unwrap())
+                            });
+                            if array.len() != N {
+                                println!("Not enough values. Fallbacking to random initial state");
+                                NQueens::new(N).unwrap().into_random_state()
+                            } else {
+                                let mut res = NQueens::new(N).unwrap().into_random_state();
+                                res.queens = array;
+                                res
+                            }
+                        }
+                    } else {
+                        println!("Error: Wronng input. Fallbacking to random initial state");
+                        NQueens::new(N).unwrap().into_random_state()
+                    }
+                } else {
+                    NQueens::new(N).unwrap().into_random_state()
+                };
+
+                // Indicamos si queremos o no modo verbose
+                n8_queens.verbose = verbose;
+                let initial_state = n8_queens.clone();
+
+                if verbose {
+                    println!("{}\n", n8_queens);
+                }
+
+                // Resolvemos el problema
+                let mut iterations = 0;
+                while n8_queens.step() != 0 {
+                    if verbose {
+                        println!("{}\n", n8_queens);
+                    }
+                    iterations += 1;
+                }
+
+                // Mostramos el resultado
+                println!("Terminado con {iterations} iteraciones.");
+                println!("Estado inicial: ");
+                println!("{initial_state}\n");
+                println!("Estado final: ");
+                println!("{n8_queens}\n");
+            }
+        }
+        Ok(())
+    } else {
+        Err("Valor de N inválido. Ingresa un valor de N válido")
     }
 }
