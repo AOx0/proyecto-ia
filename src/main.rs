@@ -1,3 +1,5 @@
+
+
 use rand::{seq::IteratorRandom, Rng};
 
 fn main() {
@@ -12,6 +14,10 @@ fn main() {
     println!("{}", n8_queens);
 }
 
+/// Máquina de estado de un problema de N-Reinas
+///
+/// Almacena el estado actual del problema así como los
+/// estados vistos en el pasado.
 struct NQueen {
     n: usize,
     queens: Vec<usize>,
