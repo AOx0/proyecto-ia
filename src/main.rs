@@ -1,28 +1,135 @@
-
-
+use std::collections::HashSet;
 use rand::{seq::IteratorRandom, Rng};
 
-fn main() {
-    let mut n8_queens = NQueen::new(8).unwrap().into_random_state();
+fn printf(s: &str) {
+    print!("{s}");
+    use std::io::Write;
+    let mut a = std::io::stdout().lock();
+    a.flush();
+}
 
-    let mut iterations = 0;
-    while n8_queens.step() != 0 {
-        // println!("{:?}\n", n8_queens);
-        iterations += 1;
+fn main() -> Result<(), &'static str> {
+    let mut n_value = String::new();
+    printf("Ingresa el valor de N: ");
+    let n = std::io::stdin().read_line(&mut n_value);
+
+    if let (Ok(_), Ok(N)) = (n, n_value.trim().parse::<usize>()) {
+        if N < 4 {
+            return Err("No se permiten valores de N menores a 4");
+        }
+
+        n_value.clear();
+        printf("Deseas mostrar información para cada paso? [y/N]: ");
+        let n = std::io::stdin().read_line(&mut n_value);
+        if let (Ok(_), verbose) = (n, n_value.trim().to_lowercase() == "y" ) {
+
+            n_value.clear();
+            printf("Deseas ingresar un estado inicial para el problema? [y/N]: ");
+            let n = std::io::stdin().read_line(&mut n_value);
+            if let (Ok(_), wants_init) = (n, n_value.trim().to_lowercase() == "y" ) {
+
+                let mut n8_queens = if wants_init {
+                    n_value.clear();
+                    println!("Ingresa los valores del estado separados por comas");
+                    println!("Un ejemplo de estado es [0, 3, 2, 1] para una N = 4");
+                    println!("    En el ejemplo:");
+                    println!("        - La reina 0 esta en la fila 0 y columna 0");
+                    println!("        - La reina 1 esta en la fila 1 y columna 3");
+                    println!("        - La reina 2 esta en la fila 2 y columna 2");
+                    println!("        - La reina 3 esta en la fila 3 y columna 1");
+                    println!("        - Todos los valores son menores a N");
+                    println!("        - Los valores estan separados por ','");   
+                    printf("Ingresa ahora el estado: ");
+                    let n = std::io::stdin().read_line(&mut n_value);
+
+                    if n.is_ok() {
+                        let mut array = Vec::with_capacity(N);
+                        let res = n_value.trim()
+                            .replace("[", "")
+                            .replace("]", "")
+                            .replace(" ", "")
+                            .split(",")
+                        .try_for_each(|val| {
+                            let res = val.trim().parse::<usize>();
+
+                            if res.is_err() {
+                                Err(format!("Valor '{}' no es un número válido", val))
+                            } else {
+                                if res.unwrap() >= N {
+                                    Err(format!("Valor '{}' mayor o igual a N ({})", val, N))
+                                } else {
+                                    Ok(())
+                                }
+                            }
+                        });
+
+                        if let Err(error) = res {
+                            println!("Error: {}. Fallbacking to random initial state", error);
+                            NQueens::new(N).unwrap().into_random_state()
+                        } else {
+                            n_value.trim()
+                            .replace("[", "")
+                            .replace("]", "")
+                            .replace(" ", "")
+                            .split(",")
+                            .for_each(|val| {
+                                array.push(val.trim().parse::<usize>().unwrap())
+                            });
+                            if array.len() != N {
+                                println!("Not enough values. Fallbacking to random initial state");
+                                NQueens::new(N).unwrap().into_random_state()
+                            } else {
+                                let mut res = NQueens::new(N).unwrap().into_random_state();
+                                res.queens = array;
+                                res
+                            }
+                        }
+                    } else {
+                        println!("Error: Wronng input. Fallbacking to random initial state");
+                        NQueens::new(N).unwrap().into_random_state()
+                    }
+                } else {
+                    NQueens::new(N).unwrap().into_random_state()
+                };
+
+                n8_queens.verbose = verbose;
+                let initial_state = n8_queens.clone();
+
+                if verbose {
+                    println!("{}\n", n8_queens);
+                }
+
+                let mut iterations = 0;
+                while n8_queens.step() != 0 {
+                    if verbose {
+                        println!("{}\n", n8_queens);
+                    }
+                    iterations += 1;
+                }
+
+                println!("Terminado con {iterations} iteraciones.");
+                println!("Estado inicial: ");
+                println!("{initial_state}\n");
+                println!("Estado final: ");
+                println!("{n8_queens}\n");
+            }
+        }
+        Ok(())
+    } else {
+        Err("Valor de N inválido. Ingresa un valor de N válido")
     }
-    println!("{}", iterations);
-    println!("{}", n8_queens);
 }
 
 /// Máquina de estado de un problema de N-Reinas
 ///
 /// Almacena el estado actual del problema así como los
 /// estados vistos en el pasado.
-struct NQueen {
+#[derive(Clone)]
+struct NQueens {
     n: usize,
     queens: Vec<usize>,
 
-    last_queens: Vec<Vec<usize>>,
+    last_queens: HashSet<Vec<usize>>,
     costs: Vec<(usize, usize, usize)>,
     verbose: bool,
 }
@@ -32,7 +139,7 @@ enum Side {
     Right,
 }
 
-impl NQueen {
+impl NQueens {
     /// Calcula los tres aspectos que influyen en el costo total de una reina.
     ///
     /// Obtiene el costo de la reina especificada, devuelve un arreglo con
@@ -76,16 +183,15 @@ impl NQueen {
         (0..self.n)
             .filter(|&x| {
                 if x != of {
-                    // La distancia de la reina actual a la reina actual a la reina seleccionada
+                    // La distancia de la reina actual a la reina seleccionada
                     let offset = x.checked_sub(of).unwrap_or_else(|| of - x);
-                    // Retamos o sumamos para calcular el valor a buscar en self.queens
+                    // Restamos o sumamos para calcular el valor a buscar en self.queens
                     if let Some(res) = match side {
                         Side::Left => self.queens[of].checked_sub(offset),
                         Side::Right => self.queens[of].checked_add(offset),
                     } {
                         // Si es igual al valor calculado devolvemos true,
-                        // lo que incrementa el contador de reinas en el mismo
-                        // renglón
+                        // lo que incrementa el contador de reinas en la misma diagonal
                         return self.queens[x] == res;
                     }
                 }
@@ -185,7 +291,7 @@ impl NQueen {
             // Forzamos algo de aleatoriedad
             self.queens[rng.gen_range(0..self.n)] = rng.gen_range(0..self.n);
         } else {
-            self.last_queens.push(self.queens.clone())
+            self.last_queens.insert(self.queens.clone());
         }
 
         // Asignamos a la reina con mayor costo uno de los valores
@@ -202,10 +308,10 @@ impl NQueen {
     /// si el tamaño deseado de tablero en `with_n` es menor a 4 no creamos la instancia.
     fn new(with_n: usize) -> Option<Self> {
         (with_n >= 4).then_some(
-            NQueen {
+            NQueens {
                 n: with_n,
                 queens: vec![0; with_n],
-                last_queens: Vec::with_capacity(100),
+                last_queens: HashSet::with_capacity(with_n * with_n),
                 costs: vec![(0, 0, 0); with_n],
                 verbose: false,
             }
@@ -220,7 +326,7 @@ impl NQueen {
 ///
 /// El valor mostrado depende de el campo `verbose`. Si es true se muestra
 /// el costo de todas las reinas, de forma individual.
-impl std::fmt::Display for NQueen {
+impl std::fmt::Display for NQueens {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         (0..self.n).try_for_each(|row| {
             (0..self.n)
@@ -229,7 +335,7 @@ impl std::fmt::Display for NQueen {
 
             if self.verbose {
                 let cost = self.cost_of(row);
-                let [lval, rval, cval] = { [cost[0], cost[1], cost[2]] };
+                let [cval, lval, rval] = { [cost[0], cost[1], cost[2]] };
                 write!(
                     f,
                     " | ld:{lval:>2} rd:{rval:>2} cc:{cval:>2} | tt:{:>2}",
