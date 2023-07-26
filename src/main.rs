@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use rand::{seq::IteratorRandom, Rng};
 /// Universidad Panamericana
 /// Facultad de Ingeniería
 ///
@@ -21,9 +22,7 @@
 ///
 ///     cargo run --release
 ///
-
-use std::collections::HashSet;
-use rand::{seq::IteratorRandom, Rng};
+use std::{borrow::Cow, collections::HashSet};
 
 /// Máquina de estado de un problema de N-Reinas
 ///
@@ -89,6 +88,7 @@ impl NQueens {
             .filter(|&x| {
                 if x != of {
                     // La distancia de la reina actual a la reina seleccionada
+                    #[allow(clippy::unnecessary_lazy_evaluations)]
                     let offset = x.checked_sub(of).unwrap_or_else(|| of - x);
                     // Restamos o sumamos para calcular el valor a buscar en self.queens
                     if let Some(res) = match side {
@@ -115,6 +115,14 @@ impl NQueens {
         self.queens.iter_mut().for_each(|queen| {
             *queen = rand::random::<usize>() % self.n;
         });
+        self
+    }
+
+    /// Asigna un estado inicial.
+    ///
+    ///
+    fn with_state(mut self, state: &[usize]) -> Self {
+        self.queens = state.to_owned();
         self
     }
 
@@ -145,7 +153,7 @@ impl NQueens {
         self.costs.sort_by(|a, b| a.1.cmp(&b.1));
 
         // Obtenemos la reina más cara
-        let worst_value = self.costs.last().and_then(|&x| Some(x.1)).unwrap();
+        let worst_value = self.costs.last().map(|&x| x.1).unwrap();
 
         // Escogemos una reina aleatoria de entre las que son igual de caras
         // que la reina más cara
@@ -212,15 +220,13 @@ impl NQueens {
     /// El código no esta pensado para tableros de tamaño menor a 4x4, por lo que
     /// si el tamaño deseado de tablero en `with_n` es menor a 4 no creamos la instancia.
     fn new(with_n: usize) -> Option<Self> {
-        (with_n >= 4).then_some(
-            NQueens {
-                n: with_n,
-                queens: vec![0; with_n],
-                last_queens: HashSet::with_capacity(with_n * with_n),
-                costs: vec![(0, 0, 0); with_n],
-                verbose: false,
-            }
-        )
+        (with_n >= 4).then_some(NQueens {
+            n: with_n,
+            queens: vec![0; with_n],
+            last_queens: HashSet::with_capacity(with_n * with_n),
+            costs: vec![(0, 0, 0); with_n],
+            verbose: false,
+        })
     }
 }
 
@@ -248,7 +254,7 @@ impl std::fmt::Display for NQueens {
                 )?;
             }
             if row != self.n - 1 {
-                write!(f, "\n")?;
+                writeln!(f)?;
             }
             Ok(())
         })?;
@@ -256,135 +262,145 @@ impl std::fmt::Display for NQueens {
     }
 }
 
-/// Función para imprimir a renglón seguido
-fn printf(s: &str) {
-    print!("{s}");
+fn pedir_valor<V, F: Fn(&str) -> Result<V, Cow<'static, str>>>(
+    msg: &'static str,
+    buff: &mut String,
+    transformer: F,
+) -> Result<V, Cow<'static, str>> {
     use std::io::Write;
-    let mut a = std::io::stdout().lock();
-    a.flush().unwrap();
+    use std::io::{stdin, stdout};
+
+    let mut out = stdout().lock();
+    write!(out, "{msg}").unwrap();
+    out.flush().unwrap();
+
+    buff.clear();
+    let input = match stdin().read_line(buff) {
+        Ok(n) if n > 0 => buff,
+        Ok(_) => {
+            return Err("No input provided, read 0 bytes from stdin"
+                .to_string()
+                .into())
+        }
+        Err(err) => return Err(format!("Error while reading stdin: {err}").into()),
+    };
+
+    transformer(input.trim())
 }
 
 /// Función main que ejecuta la logica principal del progrma
-fn main() -> Result<(), &'static str> {
-    let mut n_value = String::new();
-    printf("Ingresa el valor de N: ");
-    let n = std::io::stdin().read_line(&mut n_value);
+fn main() -> Result<(), Cow<'static, str>> {
+    let mut buff = String::new();
+    let N = pedir_valor("Ingresa el valor de N: ", &mut buff, |inp| {
+        let val = inp
+            .parse::<usize>()
+            .map_err(|_| "Valor de N inválido. Ingresa un valor de N válido.")?;
 
-    // Verificamos que N sea válido
-    if let (Ok(_), Ok(N)) = (n, n_value.trim().parse::<usize>()) {
-        if N < 4 {
-            return Err("No se permiten valores de N menores a 4");
-        }
+        (val >= 4)
+            .then_some(val)
+            .ok_or("No se permiten valores de N menores a 4".into())
+    })?;
 
-        n_value.clear();
-        printf("Deseas mostrar información para cada paso? [y/N]: ");
-        let n = std::io::stdin().read_line(&mut n_value);
+    let verbose = pedir_valor(
+        "Deseas mostrar información para cada paso? [y/N]: ",
+        &mut buff,
+        |inp| {
+            Ok((inp == "y" || inp == "Y")
+                .then_some(true)
+                .unwrap_or_else(|| {
+                    println!("Valor inválido, se considerará como que no desea información.");
+                    false
+                }))
+        },
+    )?;
 
-        // Leemos el valor ingresado para saber si quiere más información
-        if let (Ok(_), verbose) = (n, n_value.trim().to_lowercase() == "y" ) {
+    let wants_init = pedir_valor(
+        "Deseas ingresar un estado inicial para el problema? [y/N]: ",
+        &mut buff,
+        |inp| {
+            Ok((inp == "y" || inp == "Y")
+                .then_some(true)
+                .unwrap_or_else(|| {
+                    println!("Valor inválido, se considerará como que no desea un estado inicial.");
+                    false
+                }))
+        },
+    )?;
 
-            n_value.clear();
-            printf("Deseas ingresar un estado inicial para el problema? [y/N]: ");
-            let n = std::io::stdin().read_line(&mut n_value);
+    // Si quiere indicar estado inicial, lo leemos y parseamos en un vector.
+    // Este `statement` regresa un problema de NQueens, sea random si hubo algun
+    // error o asi lo quizo por defecto, o el especificado si el usuario ingresó
+    // los datos de forma correcta
+    let initial = wants_init.then(|| {
+        println!(
+            r#"
+    Ingresa los valores del estado separados por comas
+    Un ejemplo de estado es [0, 3, 2, 1] para una N = 4
+        En el ejemplo:
+            - La reina 0 esta en la fila 0 y columna 0
+            - La reina 1 esta en la fila 1 y columna 3
+            - La reina 2 esta en la fila 2 y columna 2
+            - La reina 3 esta en la fila 3 y columna 1
+            - Todos los valores son menores a N
+            - Los valores estan separados por ','
+"#
+        );
 
-            // Verificamos si quiere indicar un estado inicial
-            if let (Ok(_), wants_init) = (n, n_value.trim().to_lowercase() == "y" ) {
+        pedir_valor("Ingresa ahora el estado: ", &mut buff, |inp| {
+            let mut array = Vec::with_capacity(N);
+            inp.trim_start_matches('[')
+                .trim_end_matches(']')
+                .split(',')
+                .try_for_each(|val| {
+                    let res = val.trim().parse::<usize>();
 
-                // Si quiere indicar estado inicial, lo leemos y parseamos en un vector.
-                // Este `statement` regresa un problema de NQueens, sea random si hubo algun
-                // error o asi lo quizo por defecto, o el especificado si el usuario ingresó
-                // los datos de forma correcta
-                let mut n8_queens = if wants_init {
-                    n_value.clear();
-                    println!("Ingresa los valores del estado separados por comas");
-                    println!("Un ejemplo de estado es [0, 3, 2, 1] para una N = 4");
-                    println!("    En el ejemplo:");
-                    println!("        - La reina 0 esta en la fila 0 y columna 0");
-                    println!("        - La reina 1 esta en la fila 1 y columna 3");
-                    println!("        - La reina 2 esta en la fila 2 y columna 2");
-                    println!("        - La reina 3 esta en la fila 3 y columna 1");
-                    println!("        - Todos los valores son menores a N");
-                    println!("        - Los valores estan separados por ','");
-                    printf("Ingresa ahora el estado: ");
-                    let n = std::io::stdin().read_line(&mut n_value);
-
-                    if n.is_ok() {
-                        let mut array = Vec::with_capacity(N);
-                        let res = n_value.trim()
-                            .replace("[", "")
-                            .replace("]", "")
-                            .replace(" ", "")
-                            .split(",")
-                        .try_for_each(|val| {
-                            let res = val.trim().parse::<usize>();
-
-                            if res.is_err() {
-                                Err(format!("Valor '{}' no es un número válido", val))
-                            } else {
-                                if res.unwrap() >= N {
-                                    Err(format!("Valor '{}' mayor o igual a N ({})", val, N))
-                                } else {
-                                    Ok(())
-                                }
-                            }
-                        });
-
-                        if let Err(error) = res {
-                            println!("Error: {}. Fallbacking to random initial state", error);
-                            NQueens::new(N).unwrap().into_random_state()
+                    if let Ok(res) = res {
+                        if res >= N {
+                            Err(format!("Valor '{}' mayor o igual a N ({})", val, N))
                         } else {
-                            n_value.trim()
-                            .replace("[", "")
-                            .replace("]", "")
-                            .replace(" ", "")
-                            .split(",")
-                            .for_each(|val| {
-                                array.push(val.trim().parse::<usize>().unwrap())
-                            });
-                            if array.len() != N {
-                                println!("Not enough values. Fallbacking to random initial state");
-                                NQueens::new(N).unwrap().into_random_state()
-                            } else {
-                                let mut res = NQueens::new(N).unwrap().into_random_state();
-                                res.queens = array;
-                                res
-                            }
+                            array.push(res);
+                            Ok(())
                         }
                     } else {
-                        println!("Error: Wronng input. Fallbacking to random initial state");
-                        NQueens::new(N).unwrap().into_random_state()
+                        Err(format!("Valor '{}' no es un número válido", val))
                     }
-                } else {
-                    NQueens::new(N).unwrap().into_random_state()
-                };
-
-                // Indicamos si queremos o no modo verbose
-                n8_queens.verbose = verbose;
-                let initial_state = n8_queens.clone();
-
-                if verbose {
-                    println!("{}\n", n8_queens);
-                }
-
-                // Resolvemos el problema
-                let mut iterations = 0;
-                while n8_queens.step() != 0 {
-                    if verbose {
-                        println!("{}\n", n8_queens);
-                    }
-                    iterations += 1;
-                }
-
-                // Mostramos el resultado
-                println!("Terminado con {iterations} iteraciones.");
-                println!("Estado inicial: ");
-                println!("{initial_state}\n");
-                println!("Estado final: ");
-                println!("{n8_queens}\n");
+                })?;
+            if array.len() != N {
+                Err("Not enough values. Fallbacking to random initial state".into())
+            } else {
+                Ok(array)
             }
+        })
+    });
+
+    let nqueens = NQueens::new(N).unwrap();
+    let mut nqueens = match initial {
+        Some(Ok(a)) => nqueens.with_state(&a),
+        Some(Err(err)) => {
+            println!("{}", err);
+            nqueens.into_random_state()
         }
-        Ok(())
-    } else {
-        Err("Valor de N inválido. Ingresa un valor de N válido")
+        None => nqueens.into_random_state(),
+    };
+
+    // Indicamos si queremos o no modo verbose
+    nqueens.verbose = verbose;
+
+    let initial_state = nqueens.clone();
+    verbose.then(|| println!("{}\n", nqueens));
+
+    // Resolvemos el problema
+    let mut iterations = 0;
+    while nqueens.step() != 0 {
+        verbose.then(|| println!("{}\n", nqueens));
+        iterations += 1;
     }
+
+    // Mostramos el resultado
+    println!("Terminado con {iterations} iteraciones.");
+    println!("Estado inicial: ");
+    println!("{initial_state}\n");
+    println!("Estado final: ");
+    println!("{nqueens}\n");
+    Ok(())
 }
