@@ -1,7 +1,22 @@
 [package]
-name = "n-queens-rs"
+name = "nqueens"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+dhat = { version = "0.3.2", optional = true }
 rand = "0.8.5"
+
+[profile.pf]
+inherits = "release"
+debug = 1
+
+[features]
+dhat = ["dep:dhat"]
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "bnqueens"
+harness = false

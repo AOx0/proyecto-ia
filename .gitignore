@@ -1,3 +1,6 @@
 /target
 Cargo.lock
 .fleet
+perf.data*
+callgrind*
+dhat*
